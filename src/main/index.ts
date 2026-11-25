@@ -8,11 +8,14 @@ import { loadSettings, sanitize, saveSettings } from './settings'
 
 const settingsPath = join(app.getPath('userData'), 'settings.json')
 let settings = loadSettings(settingsPath)
+// Packaged: copied to resources/ by electron-builder. Dev: read from build/.
+const iconPath = app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(app.getAppPath(), 'build/icon.png')
 let win: BrowserWindow | null = null
 let idleTimer: NodeJS.Timeout | null = null
 
 const sess = new Session(app.getPath('userData'), () => {
-  win?.webContents.send('locked')
+  // The window is already destroyed when the app locks on close.
+  if (win && !win.isDestroyed()) win.webContents.send('locked')
 })
 
 function resetIdle(): void {
@@ -30,7 +33,7 @@ function startReminder(): void {
     const day = n.toDateString()
     if (hm !== settings.reminder || day === lastReminderDay) return
     lastReminderDay = day
-    new Notification({ title: 'MiniLifeLetter', body: 'وقت نوشتن خاطره‌ی امروز است.' }).show()
+    new Notification({ title: 'MiniLifeLetter', icon: iconPath, body: 'وقت نوشتن خاطره‌ی امروز است.' }).show()
   }, 30_000)
 }
 
@@ -129,6 +132,7 @@ function createWindow(): void {
     minHeight: 480,
     show: false,
     autoHideMenuBar: true,
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -138,6 +142,7 @@ function createWindow(): void {
   })
   win.once('ready-to-show', () => win?.show())
   win.on('minimize', () => sess.lock())
+  win.on('closed', () => { win = null })
   // Block navigation and new windows; open external links in the system browser only for https.
   win.webContents.on('will-navigate', (e) => e.preventDefault())
   win.webContents.setWindowOpenHandler(({ url }) => {
