@@ -1,0 +1,21 @@
+appId: com.minilifeletter.app
+productName: MiniLifeLetter
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - node_modules/better-sqlite3-multiple-ciphers/**
+win:
+  target: nsis
+mac:
+  target: dmg
+linux:
+  target: AppImage
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+npmRebuild: false
+electronDist: node_modules/electron/dist
+electronVersion: 45.4.1
