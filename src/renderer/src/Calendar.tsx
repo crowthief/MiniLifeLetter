@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { isFuture, localToday } from '../../shared/dates'
 import { CalKind, monthOf, shiftMonth } from './calendarMath'
 
 const WEEK = {
@@ -15,7 +16,8 @@ type Props = {
 }
 
 export function Calendar({ kind, onKind, marked, selected, onSelect }: Props) {
-  const [anchor, setAnchor] = useState(new Date().toISOString().slice(0, 10))
+  const today = localToday()
+  const [anchor, setAnchor] = useState(today)
   const month = monthOf(anchor, kind)
   const fa = new Intl.NumberFormat('fa-IR', { useGrouping: false })
 
@@ -30,7 +32,9 @@ export function Calendar({ kind, onKind, marked, selected, onSelect }: Props) {
         {WEEK[kind].map((w) => <span key={w} className="dow">{w}</span>)}
         {Array.from({ length: month.offset }, (_, i) => <span key={`o${i}`} />)}
         {month.cells.map((c) => (
-          <button key={c.iso} className={`day${marked.has(c.iso) ? ' has' : ''}${selected === c.iso ? ' sel' : ''}`}
+          <button key={c.iso} disabled={isFuture(c.iso, today)}
+            aria-current={c.iso === today ? 'date' : undefined}
+            className={`day${marked.has(c.iso) ? ' has' : ''}${selected === c.iso ? ' sel' : ''}${c.iso === today ? ' today' : ''}`}
             onClick={() => onSelect(selected === c.iso ? null : c.iso)}>
             {fa.format(c.day)}
           </button>

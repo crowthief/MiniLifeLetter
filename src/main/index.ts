@@ -1,13 +1,18 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  BrowserWindow, Notification, app, dialog, ipcMain, protocol, session as electronSession, shell
+  BrowserWindow, Menu, Notification, app, dialog, ipcMain, protocol, session as electronSession, shell
 } from 'electron'
 import { Session } from './session'
 import { loadSettings, sanitize, saveSettings } from './settings'
+import { DEFAULT_SETTINGS, Settings } from '../shared/types'
 
-const settingsPath = join(app.getPath('userData'), 'settings.json')
-let settings = loadSettings(settingsPath)
+// Settings belong to the selected account (its own folder). Defaults apply on the login screen.
+let settings: Settings = DEFAULT_SETTINGS
+const loadActive = (): void => {
+  const p = sess.settingsPath
+  settings = p ? loadSettings(p) : DEFAULT_SETTINGS
+}
 // Packaged: copied to resources/ by electron-builder. Dev: read from build/.
 const iconPath = app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(app.getAppPath(), 'build/icon.png')
 let win: BrowserWindow | null = null
@@ -43,10 +48,10 @@ function registerIpc(): void {
       resetIdle()
       return fn(...a)
     }
-  ipcMain.handle('getSettings', () => settings)
+  ipcMain.handle('getSettings', () => { loadActive(); return settings })
   ipcMain.handle('setSettings', (_e, s: unknown) => {
     settings = sanitize(s)
-    saveSettings(settingsPath, settings)
+    if (sess.settingsPath) saveSettings(sess.settingsPath, settings)
     resetIdle()
     return settings
   })
@@ -83,7 +88,15 @@ function registerIpc(): void {
     return { ok: true, value: true }
   }))
   ipcMain.handle('status', guard(() => sess.status()))
-  ipcMain.handle('createVault', guard((p: string) => sess.create(String(p))))
+  ipcMain.handle('selectAccount', guard((id: string) => { const r = sess.select(String(id)); loadActive(); return r }))
+  ipcMain.handle('createAccount', guard(async (n: string, c: string, p: string) => {
+    const r = await sess.create(String(n), String(c), String(p))
+    loadActive()
+    return r
+  }))
+  ipcMain.handle('adoptLegacy', guard((n: string, c: string) => { const r = sess.adoptLegacy(String(n), String(c)); loadActive(); return r }))
+  ipcMain.handle('deleteAccount', guard((p: string) => sess.deleteAccount(String(p))))
+  ipcMain.handle('changePassword', guard((o: string, n: string) => sess.changePassword(String(o), String(n))))
   ipcMain.handle('unlock', guard((p: string) => sess.unlock(String(p))))
   ipcMain.handle('unlockWithRecovery', guard((ph: string, np: string) => sess.recover(String(ph), String(np))))
   ipcMain.handle('lock', () => sess.lock())
@@ -131,7 +144,7 @@ function createWindow(): void {
     minWidth: 640,
     minHeight: 480,
     show: false,
-    autoHideMenuBar: true,
+    autoHideMenuBar: true, // Alt would reveal a hidden menu, so the menu is removed below instead
     icon: iconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -161,6 +174,7 @@ app.whenReady().then(() => {
       : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: mll:; connect-src 'none'"
     cb({ responseHeaders: { ...d.responseHeaders, 'Content-Security-Policy': [csp] } })
   })
+  Menu.setApplicationMenu(null)
   registerIpc()
   registerImageProtocol()
   createWindow()

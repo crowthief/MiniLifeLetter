@@ -32,9 +32,28 @@ export type AuthError =
   | 'LOCKED'
   | 'BAD_IMAGE'
   | 'BAD_BACKUP'
+  | 'BAD_NAME'
+  | 'NO_ACCOUNT'
+  | 'FUTURE_DATE'
   | 'UNKNOWN'
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: AuthError }
+
+export const ACCOUNT_COLORS = ['#6b8f71', '#c0875a', '#5f84a8', '#a8678a', '#b5594f', '#8a7fb0']
+
+export interface AccountInfo {
+  id: string
+  name: string
+  color: string // #rrggbb
+}
+
+export interface Status {
+  accounts: AccountInfo[]
+  /** True when data from before accounts existed is waiting to become the first account. */
+  legacy: boolean
+  unlocked: boolean
+  activeId: string | null
+}
 
 export interface Settings {
   theme: 'system' | 'light' | 'dark'
@@ -57,8 +76,15 @@ export interface Api {
   exportPdf(html: string): Promise<Result<boolean>>
   getSettings(): Promise<Settings>
   setSettings(s: Settings): Promise<Settings>
-  status(): Promise<{ hasVault: boolean; unlocked: boolean }>
-  createVault(password: string): Promise<Result<{ recoveryPhrase: string }>>
+  status(): Promise<Status>
+  /** Points the app at one account (for its login). Loads that account's settings. */
+  selectAccount(id: string): Promise<Result<null>>
+  createAccount(name: string, color: string, password: string): Promise<Result<{ recoveryPhrase: string }>>
+  /** Moves the pre-accounts data into a first account. Its password stays the same. */
+  adoptLegacy(name: string, color: string): Promise<Result<AccountInfo>>
+  /** Permanently deletes the open account after re-checking its password. */
+  deleteAccount(password: string): Promise<Result<null>>
+  changePassword(oldPassword: string, newPassword: string): Promise<Result<null>>
   unlock(password: string): Promise<Result<null>>
   unlockWithRecovery(phrase: string, newPassword: string): Promise<Result<null>>
   lock(): Promise<void>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Entry, Settings } from '../../shared/types'
+import type { AccountInfo, Entry, Settings } from '../../shared/types'
+import { localToday } from '../../shared/dates'
 import { SettingsPanel } from './SettingsPanel'
 import { StatsPanel } from './StatsPanel'
 import { buildPdfHtml } from './pdfHtml'
@@ -7,13 +8,11 @@ import { onThisDay } from './stats'
 import { Calendar } from './Calendar'
 import { CalKind } from './calendarMath'
 import { Editor } from './Editor'
+import { Avatar } from './AuthScreen'
+import { IconBtn, IconChart, IconExitFocus, IconFocus, IconGear, IconLock, IconPlus, IconTrash } from './Icons'
 import { Trash } from './Trash'
 
-const today = (): string => {
-  const d = new Date()
-  const p = (n: number): string => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
+const today = localToday
 
 const fmt = (iso: string, kind: CalKind): string =>
   new Intl.DateTimeFormat(`fa-IR-u-ca-${kind === 'jalali' ? 'persian' : 'gregory'}`, { dateStyle: 'full' })
@@ -22,9 +21,14 @@ const fmt = (iso: string, kind: CalKind): string =>
 const plain = (e: Entry): string =>
   `${e.title} ${e.format === 'rich' ? e.body.replace(/<[^>]*>/g, ' ') : e.body} ${e.tags.join(' ')}`.toLowerCase()
 
-type JournalProps = { onLock: () => void; settings: Settings; onSettings: (s: Settings) => void }
+type JournalProps = {
+  account: AccountInfo | null
+  onLock: () => void
+  settings: Settings
+  onSettings: (s: Settings) => void
+}
 
-export function Journal({ onLock, settings, onSettings }: JournalProps) {
+export function Journal({ account, onLock, settings, onSettings }: JournalProps) {
   const [panel, setPanel] = useState<'settings' | 'stats' | null>(null)
   const [focus, setFocus] = useState(false)
   const [entries, setEntries] = useState<Entry[]>([])
@@ -70,15 +74,18 @@ export function Journal({ onLock, settings, onSettings }: JournalProps) {
   return (
     <div className={`layout${focus ? ' focus' : ''}`}>
       <aside>
-        <div className="side-actions">
-          <button onClick={() => void create()}>خاطره‌ی جدید</button>
-          <span>
-            <button className="link" onClick={() => setPanel('stats')}>آمار</button>
-            <button className="link" onClick={() => setPanel('settings')}>تنظیمات</button>
-            <button className="link" onClick={() => setTrashOpen(true)}>سطل زباله</button>
-            <button className="link" onClick={onLock}>قفل</button>
-          </span>
-        </div>
+        <header className="side-head">
+          {account && <span className="who"><Avatar a={account} size={30} /><strong>{account.name}</strong></span>}
+          <button className="new-btn" onClick={() => void create()}><IconPlus /> خاطره‌ی جدید</button>
+          <nav className="tools" aria-label="ابزارها">
+            <IconBtn icon={<IconChart />} label="آمار" onClick={() => setPanel('stats')} />
+            <IconBtn icon={<IconTrash />} label="سطل زباله" onClick={() => setTrashOpen(true)} />
+            <IconBtn icon={focus ? <IconExitFocus /> : <IconFocus />} label={focus ? 'خروج از حالت تمرکز' : 'حالت تمرکز'}
+              active={focus} onClick={() => setFocus(!focus)} />
+            <IconBtn icon={<IconGear />} label="تنظیمات" onClick={() => setPanel('settings')} />
+            <IconBtn icon={<IconLock />} label="قفل" onClick={onLock} />
+          </nav>
+        </header>
         {memories.length > 0 && (
           <div className="memories">
             <strong>در چنین روزی</strong>
@@ -109,9 +116,11 @@ export function Journal({ onLock, settings, onSettings }: JournalProps) {
         </ul>
       </aside>
       <main>
-        <button className="link focus-toggle" onClick={() => setFocus(!focus)}>
-          {focus ? 'خروج از حالت تمرکز' : 'حالت تمرکز'}
-        </button>
+        {focus && (
+          <button className="focus-exit icon-btn" onClick={() => setFocus(false)} title="خروج از حالت تمرکز" aria-label="خروج از حالت تمرکز">
+            <IconExitFocus />
+          </button>
+        )}
         {active ? <Editor key={active.id} entry={active} onSaved={onSaved} onTrash={(id) => void trash(id)} />
           : <p className="empty">یک خاطره انتخاب کنید یا خاطره‌ی جدید بسازید.</p>}
       </main>
