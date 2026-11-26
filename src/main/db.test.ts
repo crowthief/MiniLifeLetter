@@ -1,6 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import Database from 'better-sqlite3-multiple-ciphers'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { JournalDb } from './db'
 
@@ -16,7 +17,7 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 const input = {
   title: 'سلام', body: 'یک خاطره‌ی محرمانه', format: 'rich' as const,
-  entryDate: '2026-01-05', mood: 7, tags: [] as string[]
+  entryDate: '2026-01-05', tags: [] as string[]
 }
 
 describe('JournalDb', () => {
@@ -53,13 +54,44 @@ describe('JournalDb', () => {
     expect(readFileSync(path).includes(Buffer.from('یک خاطره‌ی محرمانه'))).toBe(false)
   })
 
-  it('hides trashed entries and rejects out-of-range mood', () => {
+  it('hides trashed entries', () => {
     const db = new JournalDb(path, KEY)
     const e = db.save(input)
     db.trash(e.id)
     expect(db.list()).toHaveLength(0)
-    expect(() => db.save({ ...input, mood: 11 })).toThrow()
     db.close()
+  })
+
+  it('drops the old mood column, keeps every entry and leaves a copy of the old file', () => {
+    // Build a database in the old layout (with a mood column) using the same key.
+    const old = new Database(path)
+    old.pragma(`cipher='sqlcipher'`)
+    old.pragma(`key="x'${KEY}'"`)
+    old.exec(`CREATE TABLE entries (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '',
+      format TEXT NOT NULL DEFAULT 'rich', entry_date TEXT NOT NULL, created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL, mood INTEGER CHECK (mood IS NULL OR (mood BETWEEN 1 AND 10)), deleted_at INTEGER)`)
+    old.prepare(`INSERT INTO entries (id, title, body, entry_date, created_at, updated_at, mood)
+      VALUES ('a', 'قدیمی', 'متن', '2025-01-01', 1, 1, 7)`).run()
+    old.close()
+
+    const db = new JournalDb(path, KEY)
+    expect(db.list().map((e) => e.title)).toEqual(['قدیمی'])
+    db.save({ ...input, title: 'جدید' }) // saving works without the column
+    expect(db.list()).toHaveLength(2)
+    db.close()
+    expect(existsSync(`${path}.before-mood-removal`)).toBe(true)
+
+    // The kept copy is the untouched old database: it still has the mood value.
+    const kept = new Database(`${path}.before-mood-removal`)
+    kept.pragma(`cipher='sqlcipher'`)
+    kept.pragma(`key="x'${KEY}'"`)
+    expect((kept.prepare('SELECT mood FROM entries').get() as { mood: number }).mood).toBe(7)
+    kept.close()
+
+    // Reopening does not copy again or fail.
+    const again = new JournalDb(path, KEY)
+    expect(again.list()).toHaveLength(2)
+    again.close()
   })
 
   it('normalizes and replaces tags', () => {

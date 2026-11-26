@@ -4,7 +4,7 @@ import { buildPdfHtml } from './pdfHtml'
 
 const e = (o: Partial<Entry>): Entry => ({
   id: '1', title: 't', body: 'b', format: 'rich', entryDate: '2026-01-02', createdAt: 0, updatedAt: 0,
-  mood: null, deletedAt: null, tags: [], ...o
+  deletedAt: null, tags: [], ...o
 })
 
 describe('buildPdfHtml', () => {

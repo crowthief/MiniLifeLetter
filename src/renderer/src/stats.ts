@@ -20,14 +20,6 @@ export function streak(entries: Entry[], today: string): number {
   return n
 }
 
-/** Average mood per day, oldest first. Entries without mood are skipped. */
-export function moodSeries(entries: Entry[]): { date: string; mood: number }[] {
-  const by = new Map<string, number[]>()
-  for (const e of entries) if (e.mood != null) by.set(e.entryDate, [...(by.get(e.entryDate) ?? []), e.mood])
-  return [...by].map(([date, v]) => ({ date, mood: v.reduce((a, b) => a + b, 0) / v.length }))
-    .sort((a, b) => a.date.localeCompare(b.date))
-}
-
 // shortcut: matches Gregorian month/day only, add a Jalali variant if wanted.
 export const onThisDay = (entries: Entry[], today: string): Entry[] =>
   entries.filter((e) => e.entryDate.slice(5) === today.slice(5) && e.entryDate.slice(0, 4) < today.slice(0, 4))

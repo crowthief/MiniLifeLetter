@@ -5,6 +5,15 @@ directories:
 files:
   - out/**
   - package.json
+  # The native database module loads prebuilds/<platform>-<arch>.node at run time. Its C sources
+  # (deps, src) are only for building from source, which this project never does, so they are left out.
+  - '!node_modules/better-sqlite3-multiple-ciphers/deps/**'
+  - '!node_modules/better-sqlite3-multiple-ciphers/src/**'
+  # Binaries for platforms other than the one being built. Add the matching line when building elsewhere.
+  - '!node_modules/better-sqlite3-multiple-ciphers/prebuilds/darwin-*.node'
+  - '!node_modules/better-sqlite3-multiple-ciphers/prebuilds/linux-*.node'
+  - '!node_modules/better-sqlite3-multiple-ciphers/prebuilds/linuxmusl-*.node'
+  - '!node_modules/better-sqlite3-multiple-ciphers/prebuilds/win32-arm64.node'
 extraResources:
   - from: build/icon.png
     to: icon.png
@@ -26,3 +35,7 @@ nsis:
 npmRebuild: false
 electronDist: node_modules/electron/dist
 electronVersion: 45.4.1
+# Chromium ships ~58 language packs. The app is Persian (fa), with English as the fallback.
+electronLanguages:
+  - fa
+  - en-US

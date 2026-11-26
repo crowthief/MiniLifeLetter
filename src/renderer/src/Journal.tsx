@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import type { AccountInfo, Entry, Settings } from '../../shared/types'
 import { localToday } from '../../shared/dates'
 import { SettingsPanel } from './SettingsPanel'
@@ -7,10 +7,12 @@ import { buildPdfHtml } from './pdfHtml'
 import { onThisDay } from './stats'
 import { Calendar } from './Calendar'
 import { CalKind } from './calendarMath'
-import { Editor } from './Editor'
 import { Avatar } from './AuthScreen'
 import { IconBtn, IconChart, IconExitFocus, IconFocus, IconGear, IconLock, IconPlus, IconTrash } from './Icons'
 import { Trash } from './Trash'
+
+// The editor (Tiptap/ProseMirror) is most of the app's code and the login screen does not need it.
+const Editor = lazy(() => import('./Editor').then((m) => ({ default: m.Editor })))
 
 const today = localToday
 
@@ -45,15 +47,18 @@ export function Journal({ account, onLock, settings, onSettings }: JournalProps)
   const allTags = useMemo(() => [...new Set(entries.flatMap((e) => e.tags))].sort(), [entries])
   const memories = useMemo(() => onThisDay(entries, today()), [entries])
   const marked = useMemo(() => new Set(entries.map((e) => e.entryDate)), [entries])
+  // Searchable text is built once per change of the list, not once per keystroke in the search box.
+  const haystack = useMemo(() => new Map(entries.map((e) => [e.id, plain(e)])), [entries])
+  const deferredQuery = useDeferredValue(query)
   const shown = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = deferredQuery.trim().toLowerCase()
     return entries.filter((e) =>
-      (!q || plain(e).includes(q)) && (!tag || e.tags.includes(tag)) && (!day || e.entryDate === day))
-  }, [entries, query, tag, day])
+      (!q || haystack.get(e.id)!.includes(q)) && (!tag || e.tags.includes(tag)) && (!day || e.entryDate === day))
+  }, [entries, haystack, deferredQuery, tag, day])
 
   async function create() {
     const r = await window.api.saveEntry({
-      title: '', body: '', format: 'rich', entryDate: day ?? today(), mood: null, tags: []
+      title: '', body: '', format: 'rich', entryDate: day ?? today(), tags: []
     })
     if (!r.ok) return
     setEntries((es) => [r.value, ...es])
@@ -121,7 +126,7 @@ export function Journal({ account, onLock, settings, onSettings }: JournalProps)
             <IconExitFocus />
           </button>
         )}
-        {active ? <Editor key={active.id} entry={active} onSaved={onSaved} onTrash={(id) => void trash(id)} />
+        {active ? <Suspense fallback={<p className="empty">…</p>}><Editor key={active.id} entry={active} kind={kind} onSaved={onSaved} onTrash={(id) => void trash(id)} /></Suspense>
           : <p className="empty">یک خاطره انتخاب کنید یا خاطره‌ی جدید بسازید.</p>}
       </main>
       {panel === 'settings' && <SettingsPanel settings={settings} onChange={onSettings} onClose={() => setPanel(null)}

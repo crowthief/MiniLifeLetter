@@ -14,10 +14,6 @@ export interface VaultFile {
 
 export const MIN_PASSWORD_LENGTH = 8
 
-export function vaultExists(path: string): boolean {
-  return existsSync(path)
-}
-
 function save(path: string, v: VaultFile): void {
   const tmp = path + '.tmp'
   writeFileSync(tmp, JSON.stringify(v), { mode: 0o600 })

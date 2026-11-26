@@ -8,7 +8,7 @@ export const MESSAGES: Record<AuthError, string> = {
   INVALID_RECOVERY_PHRASE: 'کلید بازیابی باید ۲۴ کلمه‌ی معتبر باشد.',
   VAULT_EXISTS: 'قبلاً رمز ساخته شده است.',
   LOCKED: 'برنامه قفل است.',
-  BAD_IMAGE: 'تصویر معتبر نیست (فقط PNG, JPEG, GIF, WebP تا ۱۰ مگابایت).',
+  BAD_IMAGE: 'تصویر معتبر نیست (فقط PNG، JPEG، GIF و WebP تا ۱۰ مگابایت).',
   BAD_BACKUP: 'فایل پشتیبان معتبر نیست.',
   BAD_NAME: 'نام حساب خالی است، بیش از ۳۰ حرف است یا تکراری است.',
   NO_ACCOUNT: 'این حساب پیدا نشد.',

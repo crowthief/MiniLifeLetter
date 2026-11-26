@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { isFuture, localToday } from '../../shared/dates'
 import { CalKind, monthOf, shiftMonth } from './calendarMath'
 
@@ -15,11 +15,12 @@ type Props = {
   onSelect: (iso: string | null) => void
 }
 
-export function Calendar({ kind, onKind, marked, selected, onSelect }: Props) {
+const fa = new Intl.NumberFormat('fa-IR', { useGrouping: false })
+
+export const Calendar = memo(function Calendar({ kind, onKind, marked, selected, onSelect }: Props) {
   const today = localToday()
   const [anchor, setAnchor] = useState(today)
-  const month = monthOf(anchor, kind)
-  const fa = new Intl.NumberFormat('fa-IR', { useGrouping: false })
+  const month = useMemo(() => monthOf(anchor, kind), [anchor, kind])
 
   return (
     <div className="cal">
@@ -45,4 +46,4 @@ export function Calendar({ kind, onKind, marked, selected, onSelect }: Props) {
       </button>
     </div>
   )
-}
+})

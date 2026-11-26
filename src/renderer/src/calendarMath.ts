@@ -5,10 +5,14 @@ const iso = (d: Date): string => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
+// Building an Intl formatter is slow and monthOf() asks for ~60 of them: make each one once.
+const PARTS_FMT: Record<CalKind, Intl.DateTimeFormat> = {
+  jalali: new Intl.DateTimeFormat('en-u-ca-persian-nu-latn', { year: 'numeric', month: 'numeric', day: 'numeric' }),
+  gregorian: new Intl.DateTimeFormat('en-u-ca-gregory-nu-latn', { year: 'numeric', month: 'numeric', day: 'numeric' })
+}
+
 const parts = (d: Date, kind: CalKind): { y: number; m: number; d: number } => {
-  const f = new Intl.DateTimeFormat(`en-u-ca-${kind === 'jalali' ? 'persian' : 'gregory'}-nu-latn`, {
-    year: 'numeric', month: 'numeric', day: 'numeric'
-  })
+  const f = PARTS_FMT[kind]
   const o: Record<string, number> = {}
   for (const p of f.formatToParts(d)) if (p.type !== 'literal') o[p.type] = Number(p.value)
   return { y: o.year, m: o.month, d: o.day }

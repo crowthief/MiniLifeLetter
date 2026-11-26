@@ -8,7 +8,6 @@ export interface Entry {
   entryDate: string // YYYY-MM-DD (Gregorian)
   createdAt: number
   updatedAt: number
-  mood: number | null // 1..10
   deletedAt: number | null
   tags: string[]
 }
@@ -19,7 +18,6 @@ export interface EntryInput {
   body: string
   format: EntryFormat
   entryDate: string
-  mood: number | null
   tags: string[]
 }
 

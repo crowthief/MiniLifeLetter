@@ -60,7 +60,7 @@ function registerIpc(): void {
     if (!r.ok) return r
     const d = await dialog.showSaveDialog(win!, {
       defaultPath: `MiniLifeLetter-${new Date().toISOString().slice(0, 10)}.mlbackup`,
-      filters: [{ name: 'MiniLifeLetter backup', extensions: ['mlbackup'] }]
+      filters: [{ name: 'پشتیبان MiniLifeLetter', extensions: ['mlbackup'] }]
     })
     if (d.canceled || !d.filePath) return { ok: true, value: false }
     writeFileSync(d.filePath, r.value)
@@ -68,7 +68,7 @@ function registerIpc(): void {
   }))
   ipcMain.handle('restore', guard(async () => {
     const d = await dialog.showOpenDialog(win!, {
-      properties: ['openFile'], filters: [{ name: 'MiniLifeLetter backup', extensions: ['mlbackup'] }]
+      properties: ['openFile'], filters: [{ name: 'پشتیبان MiniLifeLetter', extensions: ['mlbackup'] }]
     })
     if (d.canceled || !d.filePaths[0]) return { ok: true, value: false }
     const r = sess.restoreBackup(readFileSync(d.filePaths[0]))

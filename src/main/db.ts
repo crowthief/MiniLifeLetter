@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { copyFileSync, existsSync } from 'node:fs'
 import Database from 'better-sqlite3-multiple-ciphers'
 import type { Entry, EntryInput } from '../shared/types'
 
@@ -11,7 +12,6 @@ CREATE TABLE IF NOT EXISTS entries (
   entry_date TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  mood INTEGER CHECK (mood IS NULL OR (mood BETWEEN 1 AND 10)),
   deleted_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_entries_date ON entries(entry_date);
@@ -35,12 +35,12 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 interface Row {
   id: string; title: string; body: string; format: 'rich' | 'markdown'
   entry_date: string; created_at: number; updated_at: number
-  mood: number | null; deleted_at: number | null
+  deleted_at: number | null
 }
 
 const toEntry = (r: Row, tags: string[]): Entry => ({
   id: r.id, title: r.title, body: r.body, format: r.format, entryDate: r.entry_date,
-  createdAt: r.created_at, updatedAt: r.updated_at, mood: r.mood, deletedAt: r.deleted_at, tags
+  createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at, tags
 })
 
 const cleanTags = (tags: string[]): string[] =>
@@ -59,20 +59,42 @@ export class JournalDb {
       this.db.pragma('journal_mode = WAL')
       this.db.pragma('foreign_keys = ON')
       this.db.exec(SCHEMA)
+      this.dropMood(path)
     } catch (e) {
       this.db.close()
       throw e
     }
   }
 
-  private tagsOf(id: string): string[] {
-    return (this.db.prepare('SELECT tag FROM entry_tags WHERE entry_id = ? ORDER BY tag').all(id) as { tag: string }[])
-      .map((r) => r.tag)
+  /**
+   * Mood was removed from the app. Older databases still carry the column: copy the whole file once,
+   * then drop it. A failure here must never stop the journal from opening: the column is nullable, so
+   * leaving it in place is harmless and the next open tries again.
+   */
+  private dropMood(path: string): void {
+    try {
+      const cols = this.db.pragma('table_info(entries)') as { name: string }[]
+      if (!cols.some((c) => c.name === 'mood')) return
+      const copy = `${path}.before-mood-removal`
+      if (!existsSync(copy)) {
+        this.db.pragma('wal_checkpoint(TRUNCATE)') // fold the WAL in so the file alone is complete
+        copyFileSync(path, copy)
+      }
+      this.db.exec('ALTER TABLE entries DROP COLUMN mood')
+    } catch {
+      // see above
+    }
   }
 
+  /** Rows plus their tags in two queries total. One query per entry made the list slow for big journals. */
   private query(where: string, order: string): Entry[] {
     const rows = this.db.prepare(`SELECT * FROM entries WHERE ${where} ORDER BY ${order}`).all() as Row[]
-    return rows.map((r) => toEntry(r, this.tagsOf(r.id)))
+    const tags = new Map<string, string[]>()
+    const all = this.db.prepare(
+      `SELECT entry_id, tag FROM entry_tags WHERE entry_id IN (SELECT id FROM entries WHERE ${where}) ORDER BY tag`
+    ).all() as { entry_id: string; tag: string }[]
+    for (const t of all) tags.set(t.entry_id, [...(tags.get(t.entry_id) ?? []), t.tag])
+    return rows.map((r) => toEntry(r, tags.get(r.id) ?? []))
   }
 
   list(): Entry[] {
@@ -90,13 +112,13 @@ export class JournalDb {
     this.db.transaction(() => {
       this.db
         .prepare(
-          `INSERT INTO entries (id, title, body, format, entry_date, created_at, updated_at, mood)
-           VALUES (@id, @title, @body, @format, @entryDate, @now, @now, @mood)
+          `INSERT INTO entries (id, title, body, format, entry_date, created_at, updated_at)
+           VALUES (@id, @title, @body, @format, @entryDate, @now, @now)
            ON CONFLICT(id) DO UPDATE SET title=@title, body=@body, format=@format,
-             entry_date=@entryDate, mood=@mood, updated_at=@now`
+             entry_date=@entryDate, updated_at=@now`
         )
         .run({ id, title: input.title, body: input.body, format: input.format,
-          entryDate: input.entryDate, mood: input.mood, now })
+          entryDate: input.entryDate, now })
       this.db.prepare('DELETE FROM entry_tags WHERE entry_id = ?').run(id)
       const ins = this.db.prepare('INSERT INTO entry_tags (entry_id, tag) VALUES (?, ?)')
       for (const t of tags) ins.run(id, t)

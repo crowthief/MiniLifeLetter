@@ -20,7 +20,7 @@ afterEach(() => {
   rmSync(b, { recursive: true, force: true })
 })
 
-const entry = { title: 'x', body: 'راز', format: 'rich' as const, entryDate: '2026-01-01', mood: 5, tags: [] as string[] }
+const entry = { title: 'x', body: 'راز', format: 'rich' as const, entryDate: '2026-01-01', tags: [] as string[] }
 
 describe('backup and restore', () => {
   it('restores into a fresh install and opens with the original password', async () => {
